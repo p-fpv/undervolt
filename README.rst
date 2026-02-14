@@ -22,13 +22,9 @@ For more information, read
 Installing
 ----------
 
-From PyPi::
-
-    $ pip install undervolt
-
 From source::
 
-    $ pip install git+https://github.com/georgewhewell/undervolt.git    
+    $ pip install git+https://github.com/p-fpv/undervolt.git    
     
 Note for custom kernel users: the module 'msr' ("CONFIG_X86_MSR") must be enabled in the kernel options (Processor type & features -> Model-specific register support)
 
