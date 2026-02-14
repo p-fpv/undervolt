@@ -17,9 +17,8 @@ setup(
     description='Undervolt Intel CPUs under Linux',
     long_description=open(
         join(dirname(__file__), 'README.rst')).read(),
-    url='http://github.com/georgewhewell/undervolt',
-    author='George Whewell',
-    author_email='georgerw@gmail.com',
+    url='http://github.com/p-fpv/undervolt',
+    author='origin by George Whewell',
     license='GPL',
     py_modules=['undervolt'],
     test_suite='setup.test_suite',
