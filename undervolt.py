@@ -71,7 +71,6 @@ def write_msr(val, addr):
     Writes to all msr node on all CPUs available.
     """
     assert_root()
-    
     for i in valid_cpus():
         c = '/dev/cpu/%d/msr' % i
         if not os.path.exists(c):
@@ -177,9 +176,46 @@ def pack_offset(plane_index, offset=None):
         ((offset is not None) << 32) | (offset or 0))
 
 
+def is_plane_locked(msr_response):
+    """
+    Check if voltage plane is locked (bit 62 = 1 on some CPUs, e.g., 11th gen)
+    Returns True if plane is locked and cannot be modified.
+    """
+    # Bit 62 indicates the plane is locked (common on Tiger Lake / Rocket Lake)
+    return (msr_response >> 62) & 1 == 1
+
+
+def is_plane_available(plane, msr):
+    """
+    Check if voltage plane is available for modification.
+    Returns False if plane is locked by microcode (11th gen+ behavior).
+    """
+    plane_index = PLANES[plane]
+    # Try to read current value
+    value_to_write = pack_offset(plane_index)
+    try:
+        write_msr(value_to_write, msr.addr_voltage_offsets)
+        read_back = read_msr(msr.addr_voltage_offsets)
+
+        # If plane is locked, reading it returns 0 or locked pattern
+        # For 11th gen: locked planes return specific patterns
+        if is_plane_locked(read_back):
+            return False
+
+        # Check if value is reasonable (not showing 8000+ which indicates locked)
+        offset = unpack_offset(read_back)
+        if offset is not None and offset > 1000:
+            return False
+
+        return True
+    except:
+        return False
+
+
 def unpack_offset(msr_response):
     """
     Extract the offset component of the response and unpack to voltage.
+    Returns None if plane is locked.
     >>> from undervolt import unpack_offset
     >>> unpack_offset(0x0)
     0.0
@@ -187,7 +223,10 @@ def unpack_offset(msr_response):
     0.0
     >>> unpack_offset(0x100f3400000)
     -99.609375
+    >>> unpack_offset(0x500000000)  # locked plane on 11th gen
     """
+    if is_plane_locked(msr_response):
+        return None
     plane_index = int(msr_response / (1 << 40))
     return unconvert_offset(msr_response ^ (plane_index << 40))
 
@@ -202,20 +241,44 @@ def set_temperature(temp, msr):
 
 def read_offset(plane, msr):
     """
-    Write the 'read' value to mailbox, then re-read
+    Write the 'read' value to mailbox, then re-read.
+    Returns (offset_value, is_locked) tuple.
     """
     plane_index = PLANES[plane]
     value_to_write = pack_offset(plane_index)
     write_msr(value_to_write, msr.addr_voltage_offsets)
-    return unpack_offset(read_msr(msr.addr_voltage_offsets))
+    msr_response = read_msr(msr.addr_voltage_offsets)
+
+    if is_plane_locked(msr_response):
+        return (None, True)
+
+    return (unpack_offset(msr_response), False)
 
 
 def set_offset(plane, mV, msr):
     """
     Set given voltage plane to offset mV
-    Raises SystemExit if re-reading value returns something different
+    Raises SystemExit if plane is locked or if re-reading value returns something different
     """
     plane_index = PLANES[plane]
+
+    # Check if plane is locked by trying to read it first
+    read_value, is_locked = read_offset(plane, msr)
+    if is_locked:
+        if plane in ('core', 'cache'):
+            # On 11th gen+, core and cache share the same voltage plane
+            # If cache is locked but core works, try core instead
+            if plane == 'cache':
+                logging.warning("Cache voltage plane is locked. Core and Cache share the same "
+                               "voltage plane on this CPU. Use --core instead.")
+            else:
+                logging.warning("{plane} voltage plane may be LOCKED by processor microcode. "
+                               "On 11th gen+ CPUs, only Core voltage is available.".format(plane=plane))
+        else:
+            logging.warning("{plane} voltage plane is LOCKED by processor microcode. "
+                           "This is normal for 11th gen+ CPUs. Only Core may be available.".format(plane=plane))
+        raise SystemExit(1)
+
     logging.info('Setting {plane} offset to {mV}mV'.format(
         plane=plane, mV=mV))
     target = convert_offset(mV)
@@ -223,7 +286,10 @@ def set_offset(plane, mV, msr):
     write_msr(write_value, msr.addr_voltage_offsets)
     # now check value set correctly
     want_mv = unconvert_offset(target)
-    read_mv = read_offset(plane, msr)
+    read_mv, read_locked = read_offset(plane, msr)
+    if read_locked:
+        logging.error("Failed to apply {p}: plane is now locked".format(p=plane))
+        raise SystemExit(1)
     if want_mv != read_mv:
         logging.error("Failed to apply {p}: set {t}, read {r}".format(
             p=plane, t=want_mv, r=read_mv))
@@ -343,6 +409,29 @@ def set_power_limit(power_limit, msr):
         raise SystemExit(1)
 
 
+def set_turbo(state, msr):
+    """
+    Set Turbo Boost state via MSR 0x1A0 bit 38
+    state: 1 = disabled, 0 = enabled
+    """
+    if state == 1:
+        value = 0x4000850089  # Disable Turbo (bit 38 = 1)
+    else:
+        value = 0x850089      # Enable Turbo (bit 38 = 0)
+
+    logging.info('Setting Turbo Boost to {state}'.format(
+        state='disabled' if state else 'enabled'))
+    write_msr(value, addr=0x1A0)
+
+
+def read_turbo(msr):
+    """
+    Read Turbo Boost state from MSR 0x1A0 bit 38
+    Returns: 1 = disabled, 0 = enabled
+    """
+    value = read_msr(0x1A0)
+    return (value >> 38) & 1
+
 
 def read_ac_state():
     """
@@ -391,7 +480,7 @@ def main():
     args = parser.parse_args()
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
-    
+
     msr = ADDRESSES
 
     if not glob('/dev/cpu/*/msr'):
@@ -400,7 +489,8 @@ def main():
     if (args.core or args.cache) and args.core != args.cache:
         logging.warning(
             "You have supplied different offsets for Core and Cache. "
-            "The smaller of the two (or none if you only supplied one) will be applied to both planes."
+            "The smaller of the two (or none if you only supply one) will be applied to both planes. "
+            "Note: On 11th gen+ CPUs, Cache plane is often locked. Use --core only."
         )
 
     # for each arg, try to set voltage
@@ -430,7 +520,7 @@ def main():
     if args.lock_power_limit:
         power_limit.locked = True
     if power_limit.short_term_enabled is not None or power_limit.long_term_enabled is not None:
-        set_power_limit(power_limit, msr)    
+        set_power_limit(power_limit, msr)
 
     throttlestop = getattr(args, 'throttlestop')
     if throttlestop is not None:
@@ -454,9 +544,12 @@ def main():
             temp=100 - temp
         ))
         for plane in PLANES:
-            voltage = read_offset(plane, msr)
-            print('{plane}: {voltage} mV'.format(
-                plane=plane, voltage=round(voltage, 2)))
+            voltage, is_locked = read_offset(plane, msr)
+            if is_locked:
+                print('{plane}: locked (microcode)'.format(plane=plane))
+            else:
+                print('{plane}: {voltage} mV'.format(
+                    plane=plane, voltage=round(voltage, 2)))
         power_limit = read_power_limit(msr)
         print('powerlimit: {}W (short: {}s - {}) / {}W (long: {}s - {}){}'.format(
             power_limit.short_term_power,
@@ -467,10 +560,9 @@ def main():
             'enabled' if power_limit.long_term_enabled else 'disabled',
             ' [locked]' if power_limit.locked else ''
         ))
-        with open("/sys/devices/system/cpu/intel_pstate/no_turbo","r") as file:
-            turboDisable = int(file.readline())
-            print('turbo: {}'.format("disable" if turboDisable == 1 else "enable"))
-    
+        turbo_state = read_turbo(msr)
+        print('turbo: {}'.format("disabled" if turbo_state == 1 else "enabled"))
+
     turbo = getattr(args, 'turbo')
     if turbo is not None:
         intelTurboState = int(turbo)
@@ -478,9 +570,7 @@ def main():
             print("New Intel Turbo State ENABLED")
         else:
             print("New Intel Turbo State DISABLED")
-        
-        with open("/sys/devices/system/cpu/intel_pstate/no_turbo","w+") as file:
-            file.write(str(intelTurboState))
+        set_turbo(intelTurboState, msr)
 
 if __name__ == '__main__':
     main()
