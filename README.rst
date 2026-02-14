@@ -203,62 +203,7 @@ Undervolting should work on any CPU later than Haswell.
 ================================== ========= ==========
       System                          CPU     Working?
 ================================== ========= ==========
-Acer Aspire 7 (A715-71G)           i5-7300HQ Yes
-Acer Aspire E 15 (E5-575G)         i5-7200U  Yes
-Acer Nitro 5                       i5-7300HQ Yes
-Acer Nitro 5  (An515-52)           i5-8300H  Yes
-Acer Predator (PH315-51)           i7-8750H  Yes
-Acer Swift 7 (SF714)               i5-8200Y  Yes 
-Asus FX504GE                       i7-8750H  Yes
-Asus GL703GE                       i7-8750H  Yes
-Dell G5                            i7-8750H  Yes
-Dell G5 5590                       i7-9750H  Yes
-Dell Inspiron 5577                 i7-7700HQ  Yes
-Dell Inspiron 7560                 i7-7500U  Yes
-Dell Latitude 3301                 i5-8265U  Yes
-Dell Latitude 5400                 i7-8665U  Yes
-Dell Latitude 5480                 i5-6300U  Yes
-Dell Latitude 7390                 i7-8650U  Yes
-Dell Precision 5530                i9-8950HK Yes
-Dell Precision 7530                i9-8950HK Yes
-Dell Precision 7730                E-2176M   Yes
-Dell Precision 7740                E-2286M   Yes
-Dell Precision M3800               i7-4712HQ Yes
-Dell XPS 13 9343                   i5-5200U  Yes
-Dell XPS 13 9350                   i7-6560U  Yes
-Dell XPS 13 9360                   i7-7560U  Yes
-Dell XPS 15 7590                   i7-9750H  Yes
-Dell XPS 15 7590                   i9-9980HK Yes
-Dell XPS 15 9530                   i7-4712HQ Yes
-Dell XPS 15 9550                   i7-6700HQ Yes
-Dell XPS 15 9560                   i7-7700HQ Yes
-Dell XPS 15 9570                   i9-8950HK Yes
-Dell XPS 15 9575                   i7-8705G  Yes
-HP Omen 17-an061ur                 i7-7700HQ Yes
-HP Spectre X360                    i7-8809G  Yes
-HP Zbook Studio G5                 i7-8750H  Yes
-Intel NUC7i3BNK                    i3-7100U  Yes
-Lenovo AIO Y910 27ISH              i7-6700   Yes
-Lenovo IdeaCentre Q190             1017U     No
-Lenovo Thinkpad T430               i7-3610QM No
-Lenovo Thinkpad T440p              i5-4300M  Yes
-Lenovo Thinkpad T470p              i7-7700HQ Yes
-Lenovo Thinkpad T470p              i7-7820HQ Yes
-Lenovo Thinkpad T470s              i5-7300U  Yes
-Lenovo Thinkpad T480s              i5-8250U  Yes
-Lenovo Thinkpad T490               i5-8265U  Yes
-Lenovo Thinkpad X1 Carbon          i7-6600U  Yes
-Lenovo Thinkpad X1 Extreme         i7-8750H  Yes
-Lenovo Thinkpad X1 Extreme Gen 2   i7-9750H  Yes
-Lenovo Thinkpad x250               i7-5600U  Yes
-Lenovo X1 Gen 5                    i7-7500U  Yes
-Lenovo X1 Yoga Gen 2               i7-7600U  Yes
-Lenovo Yoga 920                    i7-8550U  Yes
-MSI GE60 2QD Apache                i7-4720HQ Yes
-MSI GP73 Leopard 8RF               i7-8750H  Yes
-MacBook Air Late 2015              i5-5250U  Yes
-MacBook Air Mid 2013               i5-4250U  Yes
-Toshiba Chromebook 2               N2840     No
+clevo n960kx                       i5-11400  Yes?
 ================================== ========= ==========
 
 Troubleshooting
@@ -290,6 +235,7 @@ Credit
 ------
 This project is a trivial wrapper around the work of others from the following resources:
 
+- https://github.com/georgewhewell/undervolt
 - https://github.com/mihic/linux-intel-undervolt
 - http://forum.notebookreview.com/threads/undervolting-e-g-skylake-in-linux.807953
 - https://forums.anandtech.com/threads/what-controls-turbo-core-in-xeons.2496647
